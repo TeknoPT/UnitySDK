@@ -34,6 +34,10 @@ public class PhantasmaLinkClient: MonoBehaviour
     [Tooltip("Strongly recommend to use the version 2")]
     public int Version = 2;
 
+    [SerializeField]
+    [Tooltip("simnet -> for Local node, testnet -> for Testnet node, mainnet -> for the Mainnet node")]
+    private string _nexus = "simnet";
+
     [Header("Dapp Name")]
     [Tooltip("Here is the contract name for the desired Dapp, i.e. Pharming")]
     public string DappID = "demo";
@@ -238,6 +242,7 @@ public class PhantasmaLinkClient: MonoBehaviour
 
         this.Wallet = "Unknown";
         this.Token = null;
+        this.Nexus = _nexus;
 
         websocket = new WebSocket($"ws://{Host}/phantasma");
 
