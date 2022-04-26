@@ -64,7 +64,11 @@ public class PhantasmaLinkClient: MonoBehaviour
 
     public bool Busy { get; private set; }
 
-    public string Nexus { get; private set; }
+    public string Nexus
+    {
+        get { return _nexus; }
+        private set { _nexus = value; }
+    }
     public string Wallet { get; private set; }
     public string Token { get; private set; }
     public string Name { get; private set; }
@@ -199,7 +203,9 @@ public class PhantasmaLinkClient: MonoBehaviour
 
         _requestCallbacks[requestID] = callback;
         Debug.Log("Request=>" + request);
-
+        #if UNITY_ANDROID
+        await PhantasmaLinkClientPluginManager.Instance.SendTransaction(request);
+        #endif
         await websocket.SendText(request);
     }
 
