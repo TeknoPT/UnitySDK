@@ -16,29 +16,25 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 public class PhantasmaLinkClientClass {
+
+    public static final PhantasmaLinkClientClass Instance = new PhantasmaLinkClientClass();
+    protected static final String TAG = "Unity-Link";
+
     public static String sessionIdIntent = "sessionId";
     private static String sessionId;
     private static Activity UnityActivity;
     private static final int TX_CODE = 10;
-    private static final String WALLET_PACKAGE = "com.Phantasma.PoltergeistWallet"; // "com.phantasma.poltergeistmodule.MainActivity"
-    private static final String WALLET_ACTIVITY = "com.phantasma.poltergeistmodule.MainActivity";
-    private static PhantasmaLinkComponent phantasmaLinkComponent;
+    protected static final String WALLET_PACKAGE = "com.Phantasma.PoltergeistWallet"; // "com.phantasma.poltergeistmodule.MainActivity"
+    protected static final String WALLET_ACTIVITY = "com.phantasma.poltergeistmodule.MainActivity";
 
-    public static void ReceiveActivity(Activity activity){
+    public static PhantasmaLinkClientClass getInstance() { return Instance; }
 
-        UnityActivity = activity;
-        phantasmaLinkComponent = new PhantasmaLinkComponent();
-
-        //Intent test = new Intent(UnityActivity.getApplicationContext(), PhantasmaLinkComponent.class);
-        //test.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK |Intent.FLAG_ACTIVITY_PREVIOUS_IS_TOP|Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
-        //UnityActivity.start(test);
+    public interface SendTransactionCallback {
+        public void onShareComplete(int result);
     }
 
-    public void SendTransaction(String tx){
-        Intent sendTxIntent = new Intent(Intent.ACTION_SEND, Uri.parse(tx));
-        sendTxIntent.setClassName(WALLET_PACKAGE, WALLET_ACTIVITY);
-        sendTxIntent.putExtra("walletInteraction", tx);
-        UnityActivity.startActivityForResult(sendTxIntent, TX_CODE);
+    public static void ReceiveActivity(Activity activity){
+        UnityActivity = activity;
     }
 
     public String SendMyCommand(String tx){
@@ -59,9 +55,28 @@ public class PhantasmaLinkClientClass {
         UnityActivity.startActivity(intent);
     }
 
-    public String DoSomething(){
-
-        return "Something inside the Plugin";
+    public void sendTransaction( final String transaction, final SendTransactionCallback callback)
+    {
+        UnityActivity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Log.i(TAG,"Sending transaction");
+                try {
+                    Intent sendTxIntent = new Intent();
+                    sendTxIntent.setAction(Intent.ACTION_MAIN);
+                    sendTxIntent.putExtra(Intent.EXTRA_TEXT, transaction);
+                    sendTxIntent.setClass(UnityActivity, PhantasmaLinkOnResultCallback.class);
+                    PhantasmaLinkOnResultCallback.transactionCallback = callback;
+                    UnityActivity.startActivity(sendTxIntent);
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                    Log.i(TAG,"error sharing intent: " + e);
+                }
+            }
+        });
     }
+
 
 }

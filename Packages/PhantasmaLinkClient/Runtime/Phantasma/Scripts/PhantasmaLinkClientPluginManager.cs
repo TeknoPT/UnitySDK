@@ -9,16 +9,14 @@ public class PhantasmaLinkClientPluginManager : MonoBehaviour
 {
     public static PhantasmaLinkClientPluginManager Instance { get; private set; }
     [SerializeField] private const string PluginName = "com.phantasma.phantasmalinkclient.PhantasmaLinkClientClass";
-    
-    private AndroidJavaClass UnityClass;
-    private AndroidJavaObject UnityActivity;
-    private AndroidJavaObject _PluginInstance;
     [SerializeField] private TMP_Text DebugOutput;
 
-    private void Awake()
-    {
-        Instance = this;
-    }
+    private AndroidJavaClass UnityClass;
+    private AndroidJavaObject UnityActivity;
+    private AndroidJavaObject PluginInstance;
+    private AndroidJavaObject PluginClass;
+
+    private void Awake() => Instance = this;
 
     void Start()
     {
@@ -30,32 +28,24 @@ public class PhantasmaLinkClientPluginManager : MonoBehaviour
     private void InitializePlugin(string pluginName)
     {
 #if UNITY_ANDROID
+        PluginClass = new AndroidJavaClass(pluginName);
         UnityClass = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
         UnityActivity = UnityClass.GetStatic<AndroidJavaObject>("currentActivity");
-        _PluginInstance = new AndroidJavaObject(pluginName);
-        if (_PluginInstance == null)
+        PluginInstance  = PluginClass.CallStatic<AndroidJavaObject>("getInstance");
+        if (PluginInstance == null)
         {
             Debug.LogError("Error Loading Plugin..");
         }
         
-        _PluginInstance.CallStatic("ReceiveActivity", UnityActivity);
+        PluginInstance.CallStatic("ReceiveActivity", UnityActivity);
         PhantasmaLinkClient.Instance.Enable();
-#endif
-    }
-
-    public void OnDoSomething()
-    {
-#if UNITY_ANDROID
-        var result = _PluginInstance.Call<string>("DoSomething");
-        if (DebugOutput != null )
-            DebugOutput.text = $"Something: {result}";
 #endif
     }
 
     public void OpenWallet()
     {
         #if UNITY_ANDROID
-        _PluginInstance.Call("OpenWallet");
+        PluginInstance.Call("OpenWallet");
         #endif
     } 
 
@@ -63,7 +53,8 @@ public class PhantasmaLinkClientPluginManager : MonoBehaviour
     public async Task SendTransaction(string tx)
     {
         #if UNITY_ANDROID
-        var result = _PluginInstance.Call<string>("SendMyCommand", tx);
+        //var result = PluginInstance.Call<string>("SendMyCommand", tx);
+        OnSendTransaction(tx);
         await Task.Delay(0);
         #endif
     }
@@ -75,8 +66,55 @@ public class PhantasmaLinkClientPluginManager : MonoBehaviour
         #endif
     }
 
-    public void HandleResult()
+    #region Send Transaction
+
+    private static bool IsSending;
+    // Interface implementation
+    class SendTransactionCallback: AndroidJavaProxy
     {
+        private System.Action<int> sendHandler;
+        public SendTransactionCallback(System.Action<int> sendHandlerIn) : base (PluginName + "$SendTransactionCallback")
+        {
+            sendHandler = sendHandlerIn;
+        }
         
+        public void onShareComplete(int result)
+        {
+            Debug.Log("ShareComplete:" + result);
+            IsSending = false;
+            if (sendHandler != null)
+                sendHandler(result);
+        }
     }
+    
+    public void OnSendTransaction(string transaction)
+    {
+        SendTransaction(transaction, (int result) => {
+            Debug.Log("Send complete with: " + result);
+        });
+    }
+
+    public void SendTransaction(string transaction, System.Action<int> sendComplete)
+    {
+        if (IsSending)
+        {
+            Debug.LogError("Already sending transaction");
+            return;
+        }
+        
+        IsSending = true;
+        StartCoroutine(waitForEndOfFrame(transaction, sendComplete));
+    }
+
+    IEnumerator waitForEndOfFrame(string transaction, System.Action<int> sendComplete)
+    {
+        yield return new WaitForEndOfFrame();
+        Debug.Log("transaction:"+transaction);
+        if (Application.platform == RuntimePlatform.Android)
+        {
+            PluginInstance.Call("sendTransaction", new object[] { transaction, new SendTransactionCallback(sendComplete) });
+        }
+    }
+    
+    #endregion
 }
